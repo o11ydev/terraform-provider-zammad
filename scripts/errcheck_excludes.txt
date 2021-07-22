@@ -1,0 +1,2 @@
+// main function
+github.com/hashicorp/terraform-plugin-framework/providerserver.Serve
