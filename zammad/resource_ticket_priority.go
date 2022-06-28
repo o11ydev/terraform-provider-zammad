@@ -34,8 +34,9 @@ func (r resourceTicketPriorityType) GetSchema(_ context.Context) (tfsdk.Schema, 
 	return tfsdk.Schema{
 		Attributes: map[string]tfsdk.Attribute{
 			"id": {
-				Type:     types.StringType,
-				Computed: true,
+				Type:          types.StringType,
+				Computed:      true,
+				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
 			},
 			"name": {
 				Type:     types.StringType,
@@ -54,27 +55,30 @@ func (r resourceTicketPriorityType) GetSchema(_ context.Context) (tfsdk.Schema, 
 				Optional: true,
 			},
 			"default_create": {
-				Type:     types.BoolType,
-				Optional: true,
-				Computed: true,
+				Type:          types.BoolType,
+				Optional:      true,
+				Computed:      true,
+				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
 			},
 			"active": {
 				Type:          types.BoolType,
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}},
+				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, tfsdk.UseStateForUnknown()},
 			},
 			"created_by_id": {
-				Type:     types.Int64Type,
-				Computed: true,
+				Type:          types.Int64Type,
+				Computed:      true,
+				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
 			},
 			"updated_by_id": {
 				Type:     types.Int64Type,
 				Computed: true,
 			},
 			"created_at": {
-				Type:     types.StringType,
-				Computed: true,
+				Type:          types.StringType,
+				Computed:      true,
+				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
 			},
 			"updated_at": {
 				Type:     types.StringType,
@@ -328,23 +332,25 @@ func (r resourceTicketPriority) ImportState(ctx context.Context, req tfsdk.Impor
 
 type defaultTrue struct{}
 
-func (d *defaultTrue) Modify(ctx context.Context, req tfsdk.ModifyAttributePlanRequest, resp *tfsdk.ModifyAttributePlanResponse) {
-	if req.AttributeState == nil || resp.AttributePlan == nil || req.AttributeConfig == nil {
-		return
-	}
-	if !resp.AttributePlan.IsUnknown() {
-		return
-	}
-	if req.AttributeConfig.IsUnknown() {
-		resp.AttributePlan = types.Bool{Value: true}
-		return
-	}
+func (m defaultTrue) Description(ctx context.Context) string {
+	return "If value is not configured, defaults to true"
 }
 
-func (d *defaultTrue) Description(ctx context.Context) string {
-	return "Defaults to true."
+func (m defaultTrue) MarkdownDescription(ctx context.Context) string {
+	return "If value is not configured, defaults to `true`"
 }
 
-func (d *defaultTrue) MarkdownDescription(ctx context.Context) string {
-	return "Defaults to true."
+func (m defaultTrue) Modify(ctx context.Context, req tfsdk.ModifyAttributePlanRequest, resp *tfsdk.ModifyAttributePlanResponse) {
+	var str types.Bool
+	diags := tfsdk.ValueAs(ctx, req.AttributePlan, &str)
+	resp.Diagnostics.Append(diags...)
+	if diags.HasError() {
+		return
+	}
+
+	if !str.IsUnknown() {
+		return
+	}
+
+	resp.AttributePlan = types.Bool{Value: true}
 }
