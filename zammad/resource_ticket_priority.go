@@ -110,7 +110,7 @@ func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateReso
 	}
 
 	// Retrieve values from plan
-	var plan TicketPrority
+	var plan TicketPriority
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -135,7 +135,7 @@ func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateReso
 		return
 	}
 
-	result := TicketPrority{
+	result := TicketPriority{
 		ID:            types.String{Value: strconv.Itoa(tp.ID)},
 		Name:          types.String{Value: tp.Name},
 		Note:          types.String{Value: tp.Note},
@@ -167,7 +167,7 @@ func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateReso
 
 // Read resource information
 func (r resourceTicketPriority) Read(ctx context.Context, req tfsdk.ReadResourceRequest, resp *tfsdk.ReadResourceResponse) {
-	var state TicketPrority
+	var state TicketPriority
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -225,13 +225,13 @@ func (r resourceTicketPriority) Read(ctx context.Context, req tfsdk.ReadResource
 
 // Update resource
 func (r resourceTicketPriority) Update(ctx context.Context, req tfsdk.UpdateResourceRequest, resp *tfsdk.UpdateResourceResponse) {
-	var plan TicketPrority
+	var plan TicketPriority
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	var state TicketPrority
+	var state TicketPriority
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -266,7 +266,7 @@ func (r resourceTicketPriority) Update(ctx context.Context, req tfsdk.UpdateReso
 		return
 	}
 
-	result := TicketPrority{
+	result := TicketPriority{
 		ID:            types.String{Value: strconv.Itoa(tp.ID)},
 		Name:          types.String{Value: tp.Name},
 		Note:          types.String{Value: tp.Note},
@@ -298,7 +298,7 @@ func (r resourceTicketPriority) Update(ctx context.Context, req tfsdk.UpdateReso
 
 // Delete resource
 func (r resourceTicketPriority) Delete(ctx context.Context, req tfsdk.DeleteResourceRequest, resp *tfsdk.DeleteResourceResponse) {
-	var state TicketPrority
+	var state TicketPriority
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

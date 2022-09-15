@@ -19,8 +19,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// TicketPrority is a zammad ticker priority.
-type TicketPrority struct {
+// TicketPriority is a zammad ticket priority.
+type TicketPriority struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Note          types.String `tfsdk:"note"`
@@ -32,4 +32,19 @@ type TicketPrority struct {
 	UpdatedByID   types.Int64  `tfsdk:"updated_by_id"`
 	CreatedAt     types.String `tfsdk:"created_at"`
 	UpdatedAt     types.String `tfsdk:"updated_at"`
+}
+
+// Organization is a zammad organization.
+type Organization struct {
+	ID               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	Note             types.String `tfsdk:"note"`
+	Shared           types.Bool   `tfsdk:"shared"`
+	Domain           types.String `tfsdk:"domain"`
+	DomainAssignment types.Bool   `tfsdk:"domain_assignment"`
+	Active           types.Bool   `tfsdk:"active"`
+	CreatedByID      types.Int64  `tfsdk:"created_by_id"`
+	UpdatedByID      types.Int64  `tfsdk:"updated_by_id"`
+	CreatedAt        types.String `tfsdk:"created_at"`
+	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
