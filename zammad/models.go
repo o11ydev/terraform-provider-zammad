@@ -42,6 +42,7 @@ type Organization struct {
 	Shared           types.Bool   `tfsdk:"shared"`
 	Domain           types.String `tfsdk:"domain"`
 	DomainAssignment types.Bool   `tfsdk:"domain_assignment"`
+	MemberIDs        types.List   `tfsdk:"member_ids"`
 	Active           types.Bool   `tfsdk:"active"`
 	CreatedByID      types.Int64  `tfsdk:"created_by_id"`
 	UpdatedByID      types.Int64  `tfsdk:"updated_by_id"`

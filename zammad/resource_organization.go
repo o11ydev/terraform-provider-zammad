@@ -19,24 +19,24 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
 	"github.com/o11ydev/terraform-provider-zammad/internal/client"
 )
 
-type resourceOrganizationType struct{}
-
 // Order Resource schema
-func (r resourceOrganizationType) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
+func (r resourceOrganization) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
 	return tfsdk.Schema{
 		Attributes: map[string]tfsdk.Attribute{
 			"id": {
 				Type:          types.StringType,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: tfsdk.AttributePlanModifiers{resource.UseStateForUnknown()},
 			},
 			"name": {
 				Type:     types.StringType,
@@ -47,7 +47,12 @@ func (r resourceOrganizationType) GetSchema(_ context.Context) (tfsdk.Schema, di
 				Optional:      true,
 				Computed:      true,
 				Description:   "Customers in the organization can see each other's items.",
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, resource.UseStateForUnknown()},
+			},
+			"member_ids": {
+				Type:     types.ListType{ElemType: types.Int64Type},
+				Computed: true,
+				Optional: true,
 			},
 			"domain": {
 				Type:     types.StringType,
@@ -64,7 +69,7 @@ func (r resourceOrganizationType) GetSchema(_ context.Context) (tfsdk.Schema, di
 				Type:          types.BoolType,
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, resource.UseStateForUnknown()},
 			},
 			"note": {
 				Type:     types.StringType,
@@ -73,7 +78,7 @@ func (r resourceOrganizationType) GetSchema(_ context.Context) (tfsdk.Schema, di
 			"created_by_id": {
 				Type:          types.Int64Type,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
 			},
 			"updated_by_id": {
 				Type:     types.Int64Type,
@@ -82,7 +87,7 @@ func (r resourceOrganizationType) GetSchema(_ context.Context) (tfsdk.Schema, di
 			"created_at": {
 				Type:          types.StringType,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
 			},
 			"updated_at": {
 				Type:     types.StringType,
@@ -92,27 +97,27 @@ func (r resourceOrganizationType) GetSchema(_ context.Context) (tfsdk.Schema, di
 	}, nil
 }
 
-// New resource instance
-func (r resourceOrganizationType) NewResource(_ context.Context, p tfsdk.Provider) (tfsdk.Resource, diag.Diagnostics) {
-	return resourceOrganization{
-		p: *(p.(*provider)),
-	}, nil
+func NewZammadOrganization() resource.Resource {
+	return &resourceOrganization{}
+}
+
+func (r *resourceOrganization) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	r.client, _ = req.ProviderData.(*client.Client)
+}
+
+func (r *resourceOrganization) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_organization"
 }
 
 type resourceOrganization struct {
-	p provider
+	client *client.Client
 }
 
 // Create a new resource
-func (r resourceOrganization) Create(ctx context.Context, req tfsdk.CreateResourceRequest, resp *tfsdk.CreateResourceResponse) {
-	if !r.p.configured {
-		resp.Diagnostics.AddError(
-			"Provider not configured",
-			"The provider hasn't been configured before apply, likely because it depends on an unknown value from another resource. This leads to weird stuff happening, so we'd prefer if you didn't do that. Thanks!",
-		)
-		return
-	}
-
+func (r resourceOrganization) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
 	var plan Organization
 	diags := req.Plan.Get(ctx, &plan)
@@ -122,15 +127,15 @@ func (r resourceOrganization) Create(ctx context.Context, req tfsdk.CreateResour
 	}
 
 	orgreq := &client.Organization{
-		Name:             plan.Name.Value,
-		Active:           plan.Active.Value,
-		Note:             plan.Note.Value,
-		Domain:           plan.Domain.Value,
-		DomainAssignment: plan.DomainAssignment.Value,
-		Shared:           plan.Shared.Value,
+		Name:             plan.Name.ValueString(),
+		Active:           plan.Active.ValueBool(),
+		Note:             plan.Note.ValueString(),
+		Domain:           plan.Domain.ValueString(),
+		DomainAssignment: plan.DomainAssignment.ValueBool(),
+		Shared:           plan.Shared.ValueBool(),
 	}
 
-	org, err := r.p.client.CreateOrganization(orgreq)
+	org, err := r.client.CreateOrganization(orgreq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating organization",
@@ -139,21 +144,27 @@ func (r resourceOrganization) Create(ctx context.Context, req tfsdk.CreateResour
 		return
 	}
 
-	result := Organization{
-		ID:               types.String{Value: strconv.Itoa(org.ID)},
-		Name:             types.String{Value: org.Name},
-		Note:             types.String{Value: org.Note},
-		Shared:           types.Bool{Value: org.Shared},
-		Domain:           types.String{Value: org.Domain},
-		DomainAssignment: types.Bool{Value: org.DomainAssignment},
-		Active:           types.Bool{Value: org.Active},
-		CreatedByID:      types.Int64{Value: int64(org.CreatedByID)},
-		UpdatedByID:      types.Int64{Value: int64(org.UpdatedByID)},
-		CreatedAt:        types.String{Value: org.CreatedAt},
-		UpdatedAt:        types.String{Value: org.UpdatedAt},
+	members := make([]attr.Value, len(org.MemberIDs))
+	for i, _ := range org.MemberIDs {
+		members[i] = types.Int64Value(int64(org.MemberIDs[i]))
 	}
-	if plan.Note.Null && org.Note == "" {
-		result.Note = types.String{Null: true}
+
+	result := Organization{
+		ID:               types.StringValue(strconv.Itoa(org.ID)),
+		Name:             types.StringValue(org.Name),
+		Note:             types.StringValue(org.Note),
+		Shared:           types.BoolValue(org.Shared),
+		Domain:           types.StringValue(org.Domain),
+		DomainAssignment: types.BoolValue(org.DomainAssignment),
+		Active:           types.BoolValue(org.Active),
+		CreatedByID:      types.Int64Value(int64(org.CreatedByID)),
+		UpdatedByID:      types.Int64Value(int64(org.UpdatedByID)),
+		CreatedAt:        types.StringValue(org.CreatedAt),
+		UpdatedAt:        types.StringValue(org.UpdatedAt),
+		MemberIDs:        types.ListValueMust(types.Int64Type, members),
+	}
+	if plan.Note.IsNull() && org.Note == "" {
+		result.Note = types.StringNull()
 	}
 
 	diags = resp.State.Set(ctx, result)
@@ -164,7 +175,7 @@ func (r resourceOrganization) Create(ctx context.Context, req tfsdk.CreateResour
 }
 
 // Read resource information
-func (r resourceOrganization) Read(ctx context.Context, req tfsdk.ReadResourceRequest, resp *tfsdk.ReadResourceResponse) {
+func (r resourceOrganization) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state Organization
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -172,38 +183,38 @@ func (r resourceOrganization) Read(ctx context.Context, req tfsdk.ReadResourceRe
 		return
 	}
 
-	orgID, err := strconv.Atoi(state.ID.Value)
+	orgID, err := strconv.Atoi(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ID",
-			"Could convert id "+state.ID.Value+": "+err.Error(),
+			"Could convert id "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 
 	}
 
-	neworg, err := r.p.client.GetOrganization(orgID)
+	neworg, err := r.client.GetOrganization(orgID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading organization",
-			"Could not read organization "+state.ID.Value+": "+err.Error(),
+			"Could not read organization "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
-	state.Name = types.String{Value: neworg.Name}
-	state.Active = types.Bool{Value: neworg.Active}
-	state.Shared = types.Bool{Value: neworg.Shared}
-	state.Domain = types.String{Value: neworg.Domain}
-	state.DomainAssignment = types.Bool{Value: neworg.DomainAssignment}
-	state.UpdatedAt = types.String{Value: neworg.UpdatedAt}
-	state.UpdatedByID = types.Int64{Value: int64(neworg.UpdatedByID)}
-	state.CreatedAt = types.String{Value: neworg.CreatedAt}
-	state.CreatedByID = types.Int64{Value: int64(neworg.CreatedByID)}
-	if state.Note.Null && neworg.Note == "" {
-		state.Note = types.String{Null: true}
+	state.Name = types.StringValue(neworg.Name)
+	state.Active = types.BoolValue(neworg.Active)
+	state.Shared = types.BoolValue(neworg.Shared)
+	state.Domain = types.StringValue(neworg.Domain)
+	state.DomainAssignment = types.BoolValue(neworg.DomainAssignment)
+	state.UpdatedAt = types.StringValue(neworg.UpdatedAt)
+	state.UpdatedByID = types.Int64Value(int64(neworg.UpdatedByID))
+	state.CreatedAt = types.StringValue(neworg.CreatedAt)
+	state.CreatedByID = types.Int64Value(int64(neworg.CreatedByID))
+	if state.Note.IsNull() && neworg.Note == "" {
+		state.Note = types.StringNull()
 	} else {
-		state.Note = types.String{Value: neworg.Note}
+		state.Note = types.StringValue(neworg.Note)
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -214,7 +225,7 @@ func (r resourceOrganization) Read(ctx context.Context, req tfsdk.ReadResourceRe
 }
 
 // Update resource
-func (r resourceOrganization) Update(ctx context.Context, req tfsdk.UpdateResourceRequest, resp *tfsdk.UpdateResourceResponse) {
+func (r resourceOrganization) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan Organization
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -228,49 +239,49 @@ func (r resourceOrganization) Update(ctx context.Context, req tfsdk.UpdateResour
 		return
 	}
 
-	orgID, err := strconv.Atoi(state.ID.Value)
+	orgID, err := strconv.Atoi(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ID",
-			"Could convert id "+state.ID.Value+": "+err.Error(),
+			"Could convert id "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	updatedOrg := &client.Organization{
 		ID:               orgID,
-		Name:             plan.Name.Value,
-		Note:             plan.Note.Value,
-		Domain:           plan.Domain.Value,
-		DomainAssignment: plan.DomainAssignment.Value,
-		Active:           plan.Active.Value,
-		Shared:           plan.Shared.Value,
+		Name:             plan.Name.ValueString(),
+		Note:             plan.Note.ValueString(),
+		Domain:           plan.Domain.ValueString(),
+		DomainAssignment: plan.DomainAssignment.ValueBool(),
+		Active:           plan.Active.ValueBool(),
+		Shared:           plan.Shared.ValueBool(),
 	}
 
-	org, err := r.p.client.UpdateOrganization(updatedOrg)
+	org, err := r.client.UpdateOrganization(updatedOrg)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error update organization",
-			"Could not update organization "+state.ID.Value+": "+err.Error(),
+			"Could not update organization "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	result := Organization{
-		ID:               types.String{Value: strconv.Itoa(org.ID)},
-		Name:             types.String{Value: org.Name},
-		Note:             types.String{Value: org.Note},
-		Domain:           types.String{Value: org.Domain},
-		DomainAssignment: types.Bool{Value: org.DomainAssignment},
-		Active:           types.Bool{Value: org.Active},
-		Shared:           types.Bool{Value: org.Shared},
-		CreatedByID:      types.Int64{Value: int64(org.CreatedByID)},
-		UpdatedByID:      types.Int64{Value: int64(org.UpdatedByID)},
-		CreatedAt:        types.String{Value: org.CreatedAt},
-		UpdatedAt:        types.String{Value: org.UpdatedAt},
+		ID:               types.StringValue(strconv.Itoa(org.ID)),
+		Name:             types.StringValue(org.Name),
+		Note:             types.StringValue(org.Note),
+		Domain:           types.StringValue(org.Domain),
+		DomainAssignment: types.BoolValue(org.DomainAssignment),
+		Active:           types.BoolValue(org.Active),
+		Shared:           types.BoolValue(org.Shared),
+		CreatedByID:      types.Int64Value(int64(org.CreatedByID)),
+		UpdatedByID:      types.Int64Value(int64(org.UpdatedByID)),
+		CreatedAt:        types.StringValue(org.CreatedAt),
+		UpdatedAt:        types.StringValue(org.UpdatedAt),
 	}
-	if plan.Note.Null && org.Note == "" {
-		result.Note = types.String{Null: true}
+	if plan.Note.IsNull() && org.Note == "" {
+		result.Note = types.StringNull()
 	}
 
 	diags = resp.State.Set(ctx, result)
@@ -281,7 +292,7 @@ func (r resourceOrganization) Update(ctx context.Context, req tfsdk.UpdateResour
 }
 
 // Delete resource
-func (r resourceOrganization) Delete(ctx context.Context, req tfsdk.DeleteResourceRequest, resp *tfsdk.DeleteResourceResponse) {
+func (r resourceOrganization) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state Organization
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -289,27 +300,27 @@ func (r resourceOrganization) Delete(ctx context.Context, req tfsdk.DeleteResour
 		return
 	}
 
-	orgID, err := strconv.Atoi(state.ID.Value)
+	orgID, err := strconv.Atoi(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ID",
-			"Could convert id "+state.ID.Value+": "+err.Error(),
+			"Could convert id "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
-	err = r.p.client.DeleteOrganization(&client.Organization{ID: orgID})
+	err = r.client.DeleteOrganization(&client.Organization{ID: orgID})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting organization",
-			"Could not delete organization "+state.ID.Value+": "+err.Error(),
+			"Could not delete organization "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 }
 
 // Import resource
-func (r resourceOrganization) ImportState(ctx context.Context, req tfsdk.ImportResourceStateRequest, resp *tfsdk.ImportResourceStateResponse) {
+func (r resourceOrganization) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Save the import identifier in the id attribute
-	tfsdk.ResourceImportStatePassthroughID(ctx, tftypes.NewAttributePath().WithAttributeName("id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

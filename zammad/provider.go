@@ -21,20 +21,23 @@ import (
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	tfprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+
 	"github.com/o11ydev/terraform-provider-zammad/internal/client"
 )
 
-func New() tfsdk.Provider {
+func New() tfprovider.Provider {
 	return &provider{}
 }
 
 type provider struct {
-	configured bool
-	client     *client.Client
 }
 
 // GetSchema
@@ -56,13 +59,17 @@ func (p *provider) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics)
 	}, nil
 }
 
+func (p *provider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {
+	resp.TypeName = "zammad"
+}
+
 // Provider schema struct
 type providerData struct {
 	Token types.String `tfsdk:"token"`
 	Host  types.String `tfsdk:"host"`
 }
 
-func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderRequest, resp *tfsdk.ConfigureProviderResponse) {
+func (p *provider) Configure(ctx context.Context, req tfprovider.ConfigureRequest, resp *tfprovider.ConfigureResponse) {
 	// Retrieve provider data from configuration
 	var config providerData
 	diags := req.Config.Get(ctx, &config)
@@ -73,7 +80,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	// User must provide a token to the provider
 	var token string
-	if config.Token.Unknown {
+	if config.Token.IsUnknown() {
 		// Cannot connect to client with an unknown value
 		resp.Diagnostics.AddWarning(
 			"Unable to create client",
@@ -82,10 +89,10 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 
-	if config.Token.Null {
+	if config.Token.IsNull() {
 		token = os.Getenv("ZAMMAD_TOKEN")
 	} else {
-		token = config.Token.Value
+		token = config.Token.ValueString()
 	}
 
 	if token == "" {
@@ -99,7 +106,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	// User must specify a host
 	var host string
-	if config.Host.Unknown {
+	if config.Host.IsUnknown() {
 		// Cannot connect to client with an unknown value
 		resp.Diagnostics.AddError(
 			"Unable to create client",
@@ -108,10 +115,10 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 
-	if config.Host.Null {
+	if config.Host.IsNull() {
 		host = os.Getenv("ZAMMAD_HOST")
 	} else {
-		host = config.Host.Value
+		host = config.Host.ValueString()
 	}
 
 	if host == "" {
@@ -138,19 +145,17 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 
-	p.client = c
-	p.configured = true
+	resp.DataSourceData = c
+	resp.ResourceData = c
 }
 
-// GetResources - Defines provider resources
-func (p *provider) GetResources(_ context.Context) (map[string]tfsdk.ResourceType, diag.Diagnostics) {
-	return map[string]tfsdk.ResourceType{
-		"zammad_ticket_priority": resourceTicketPriorityType{},
-		"zammad_organization":    resourceOrganizationType{},
-	}, nil
+// Resources - Defines provider resources
+func (p *provider) Resources(_ context.Context) []func() resource.Resource {
+	return []func() resource.Resource{
+		NewZammadTicketPriority,
+		NewZammadOrganization,
+	}
 }
-
-// GetDataSources - Defines provider data sources
-func (p *provider) GetDataSources(_ context.Context) (map[string]tfsdk.DataSourceType, diag.Diagnostics) {
-	return map[string]tfsdk.DataSourceType{}, nil
+func (p *provider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{}
 }

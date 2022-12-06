@@ -20,23 +20,30 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-go/tftypes"
 
 	"github.com/o11ydev/terraform-provider-zammad/internal/client"
 )
 
-type resourceTicketPriorityType struct{}
+func NewZammadTicketPriority() resource.Resource {
+	return &resourceTicketPriority{}
+}
 
-// Order Resource schema
-func (r resourceTicketPriorityType) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
+type resourceTicketPriority struct {
+	client *client.Client
+}
+
+// Ticket Priority Resource schema
+func (r resourceTicketPriority) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
 	return tfsdk.Schema{
 		Attributes: map[string]tfsdk.Attribute{
 			"id": {
 				Type:          types.StringType,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
 			},
 			"name": {
 				Type:     types.StringType,
@@ -58,18 +65,18 @@ func (r resourceTicketPriorityType) GetSchema(_ context.Context) (tfsdk.Schema, 
 				Type:          types.BoolType,
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
 			},
 			"active": {
 				Type:          types.BoolType,
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, resource.UseStateForUnknown()},
 			},
 			"created_by_id": {
 				Type:          types.Int64Type,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
 			},
 			"updated_by_id": {
 				Type:     types.Int64Type,
@@ -78,7 +85,7 @@ func (r resourceTicketPriorityType) GetSchema(_ context.Context) (tfsdk.Schema, 
 			"created_at": {
 				Type:          types.StringType,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{tfsdk.UseStateForUnknown()},
+				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
 			},
 			"updated_at": {
 				Type:     types.StringType,
@@ -88,27 +95,19 @@ func (r resourceTicketPriorityType) GetSchema(_ context.Context) (tfsdk.Schema, 
 	}, nil
 }
 
-// New resource instance
-func (r resourceTicketPriorityType) NewResource(_ context.Context, p tfsdk.Provider) (tfsdk.Resource, diag.Diagnostics) {
-	return resourceTicketPriority{
-		p: *(p.(*provider)),
-	}, nil
+func (r *resourceTicketPriority) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_ticket_priority"
 }
 
-type resourceTicketPriority struct {
-	p provider
+func (r *resourceTicketPriority) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	r.client, _ = req.ProviderData.(*client.Client)
 }
 
 // Create a new resource
-func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateResourceRequest, resp *tfsdk.CreateResourceResponse) {
-	if !r.p.configured {
-		resp.Diagnostics.AddError(
-			"Provider not configured",
-			"The provider hasn't been configured before apply, likely because it depends on an unknown value from another resource. This leads to weird stuff happening, so we'd prefer if you didn't do that. Thanks!",
-		)
-		return
-	}
-
+func (r resourceTicketPriority) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
 	var plan TicketPriority
 	diags := req.Plan.Get(ctx, &plan)
@@ -118,15 +117,15 @@ func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateReso
 	}
 
 	tpreq := &client.TicketPriority{
-		Name:          plan.Name.Value,
-		Note:          plan.Note.Value,
-		UIColor:       plan.UIColor.Value,
-		UIIcon:        plan.UIIcon.Value,
-		Active:        plan.Active.Value,
-		DefaultCreate: plan.DefaultCreate.Value,
+		Name:          plan.Name.ValueString(),
+		Note:          plan.Note.ValueString(),
+		UIColor:       plan.UIColor.ValueString(),
+		UIIcon:        plan.UIIcon.ValueString(),
+		Active:        plan.Active.ValueBool(),
+		DefaultCreate: plan.DefaultCreate.ValueBool(),
 	}
 
-	tp, err := r.p.client.CreateTicketPriority(tpreq)
+	tp, err := r.client.CreateTicketPriority(tpreq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating ticket_priotiry",
@@ -136,26 +135,26 @@ func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateReso
 	}
 
 	result := TicketPriority{
-		ID:            types.String{Value: strconv.Itoa(tp.ID)},
-		Name:          types.String{Value: tp.Name},
-		Note:          types.String{Value: tp.Note},
-		UIColor:       types.String{Value: tp.UIColor},
-		UIIcon:        types.String{Value: tp.UIIcon},
-		Active:        types.Bool{Value: tp.Active},
-		DefaultCreate: types.Bool{Value: tp.DefaultCreate},
-		CreatedByID:   types.Int64{Value: int64(tp.CreatedByID)},
-		UpdatedByID:   types.Int64{Value: int64(tp.UpdatedByID)},
-		CreatedAt:     types.String{Value: tp.CreatedAt},
-		UpdatedAt:     types.String{Value: tp.UpdatedAt},
+		ID:            types.StringValue(strconv.Itoa(tp.ID)),
+		Name:          types.StringValue(tp.Name),
+		Note:          types.StringValue(tp.Note),
+		UIColor:       types.StringValue(tp.UIColor),
+		UIIcon:        types.StringValue(tp.UIIcon),
+		Active:        types.BoolValue(tp.Active),
+		DefaultCreate: types.BoolValue(tp.DefaultCreate),
+		CreatedByID:   types.Int64Value(int64(tp.CreatedByID)),
+		UpdatedByID:   types.Int64Value(int64(tp.UpdatedByID)),
+		CreatedAt:     types.StringValue(tp.CreatedAt),
+		UpdatedAt:     types.StringValue(tp.UpdatedAt),
 	}
-	if plan.UIColor.Null && tp.UIColor == "" {
-		result.UIColor = types.String{Null: true}
+	if plan.UIColor.IsNull() && tp.UIColor == "" {
+		result.UIColor = types.StringNull()
 	}
-	if plan.UIIcon.Null && tp.UIIcon == "" {
-		result.UIIcon = types.String{Null: true}
+	if plan.UIIcon.IsNull() && tp.UIIcon == "" {
+		result.UIIcon = types.StringNull()
 	}
-	if plan.Note.Null && tp.Note == "" {
-		result.Note = types.String{Null: true}
+	if plan.Note.IsNull() && tp.Note == "" {
+		result.Note = types.StringNull()
 	}
 
 	diags = resp.State.Set(ctx, result)
@@ -166,7 +165,7 @@ func (r resourceTicketPriority) Create(ctx context.Context, req tfsdk.CreateReso
 }
 
 // Read resource information
-func (r resourceTicketPriority) Read(ctx context.Context, req tfsdk.ReadResourceRequest, resp *tfsdk.ReadResourceResponse) {
+func (r resourceTicketPriority) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state TicketPriority
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -174,46 +173,46 @@ func (r resourceTicketPriority) Read(ctx context.Context, req tfsdk.ReadResource
 		return
 	}
 
-	tpID, err := strconv.Atoi(state.ID.Value)
+	tpID, err := strconv.Atoi(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ID",
-			"Could convert id "+state.ID.Value+": "+err.Error(),
+			"Could convert id "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 
 	}
 
-	newtp, err := r.p.client.GetTicketPriority(tpID)
+	newtp, err := r.client.GetTicketPriority(tpID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ticket_priority",
-			"Could not read ticket_priority "+state.ID.Value+": "+err.Error(),
+			"Could not read ticket_priority "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
-	state.Name = types.String{Value: newtp.Name}
-	state.CreatedAt = types.String{Value: newtp.CreatedAt}
-	state.Active = types.Bool{Value: newtp.Active}
-	state.DefaultCreate = types.Bool{Value: newtp.DefaultCreate}
-	state.UpdatedAt = types.String{Value: newtp.UpdatedAt}
-	state.UpdatedByID = types.Int64{Value: int64(newtp.UpdatedByID)}
-	state.CreatedByID = types.Int64{Value: int64(newtp.CreatedByID)}
-	if state.UIColor.Null && newtp.UIColor == "" {
-		state.UIColor = types.String{Null: true}
+	state.Name = types.StringValue(newtp.Name)
+	state.CreatedAt = types.StringValue(newtp.CreatedAt)
+	state.Active = types.BoolValue(newtp.Active)
+	state.DefaultCreate = types.BoolValue(newtp.DefaultCreate)
+	state.UpdatedAt = types.StringValue(newtp.UpdatedAt)
+	state.UpdatedByID = types.Int64Value(int64(newtp.UpdatedByID))
+	state.CreatedByID = types.Int64Value(int64(newtp.CreatedByID))
+	if state.UIColor.IsNull() && newtp.UIColor == "" {
+		state.UIColor = types.StringNull()
 	} else {
-		state.UIColor = types.String{Value: newtp.UIColor}
+		state.UIColor = types.StringValue(newtp.UIColor)
 	}
-	if state.UIIcon.Null && newtp.UIIcon == "" {
-		state.UIIcon = types.String{Null: true}
+	if state.UIIcon.IsNull() && newtp.UIIcon == "" {
+		state.UIIcon = types.StringNull()
 	} else {
-		state.UIIcon = types.String{Value: newtp.UIIcon}
+		state.UIIcon = types.StringValue(newtp.UIIcon)
 	}
-	if state.Note.Null && newtp.Note == "" {
-		state.Note = types.String{Null: true}
+	if state.Note.IsNull() && newtp.Note == "" {
+		state.Note = types.StringNull()
 	} else {
-		state.Note = types.String{Value: newtp.Note}
+		state.Note = types.StringValue(newtp.Note)
 	}
 
 	diags = resp.State.Set(ctx, &state)
@@ -224,7 +223,7 @@ func (r resourceTicketPriority) Read(ctx context.Context, req tfsdk.ReadResource
 }
 
 // Update resource
-func (r resourceTicketPriority) Update(ctx context.Context, req tfsdk.UpdateResourceRequest, resp *tfsdk.UpdateResourceResponse) {
+func (r resourceTicketPriority) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan TicketPriority
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -238,55 +237,55 @@ func (r resourceTicketPriority) Update(ctx context.Context, req tfsdk.UpdateReso
 		return
 	}
 
-	tpID, err := strconv.Atoi(state.ID.Value)
+	tpID, err := strconv.Atoi(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ID",
-			"Could convert id "+state.ID.Value+": "+err.Error(),
+			"Could convert id "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	updatedTP := &client.TicketPriority{
 		ID:            tpID,
-		Name:          plan.Name.Value,
-		Note:          plan.Note.Value,
-		UIColor:       plan.UIColor.Value,
-		UIIcon:        plan.UIIcon.Value,
-		Active:        plan.Active.Value,
-		DefaultCreate: plan.DefaultCreate.Value,
+		Name:          plan.Name.ValueString(),
+		Note:          plan.Note.ValueString(),
+		UIColor:       plan.UIColor.ValueString(),
+		UIIcon:        plan.UIIcon.ValueString(),
+		Active:        plan.Active.ValueBool(),
+		DefaultCreate: plan.DefaultCreate.ValueBool(),
 	}
 
-	tp, err := r.p.client.UpdateTicketPriority(updatedTP)
+	tp, err := r.client.UpdateTicketPriority(updatedTP)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error update order",
-			"Could not update orderID "+state.ID.Value+": "+err.Error(),
+			"Could not update orderID "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
 	result := TicketPriority{
-		ID:            types.String{Value: strconv.Itoa(tp.ID)},
-		Name:          types.String{Value: tp.Name},
-		Note:          types.String{Value: tp.Note},
-		UIColor:       types.String{Value: tp.UIColor},
-		UIIcon:        types.String{Value: tp.UIIcon},
-		Active:        types.Bool{Value: tp.Active},
-		DefaultCreate: types.Bool{Value: tp.DefaultCreate},
-		CreatedByID:   types.Int64{Value: int64(tp.CreatedByID)},
-		UpdatedByID:   types.Int64{Value: int64(tp.UpdatedByID)},
-		CreatedAt:     types.String{Value: tp.CreatedAt},
-		UpdatedAt:     types.String{Value: tp.UpdatedAt},
+		ID:            types.StringValue(strconv.Itoa(tp.ID)),
+		Name:          types.StringValue(tp.Name),
+		Note:          types.StringValue(tp.Note),
+		UIColor:       types.StringValue(tp.UIColor),
+		UIIcon:        types.StringValue(tp.UIIcon),
+		Active:        types.BoolValue(tp.Active),
+		DefaultCreate: types.BoolValue(tp.DefaultCreate),
+		CreatedByID:   types.Int64Value(int64(tp.CreatedByID)),
+		UpdatedByID:   types.Int64Value(int64(tp.UpdatedByID)),
+		CreatedAt:     types.StringValue(tp.CreatedAt),
+		UpdatedAt:     types.StringValue(tp.UpdatedAt),
 	}
-	if plan.UIColor.Null && tp.UIColor == "" {
-		result.UIColor = types.String{Null: true}
+	if plan.UIColor.IsNull() && tp.UIColor == "" {
+		result.UIColor = types.StringNull()
 	}
-	if plan.UIIcon.Null && tp.UIIcon == "" {
-		result.UIIcon = types.String{Null: true}
+	if plan.UIIcon.IsNull() && tp.UIIcon == "" {
+		result.UIIcon = types.StringNull()
 	}
-	if plan.Note.Null && tp.Note == "" {
-		result.Note = types.String{Null: true}
+	if plan.Note.IsNull() && tp.Note == "" {
+		result.Note = types.StringNull()
 	}
 
 	diags = resp.State.Set(ctx, result)
@@ -297,7 +296,7 @@ func (r resourceTicketPriority) Update(ctx context.Context, req tfsdk.UpdateReso
 }
 
 // Delete resource
-func (r resourceTicketPriority) Delete(ctx context.Context, req tfsdk.DeleteResourceRequest, resp *tfsdk.DeleteResourceResponse) {
+func (r resourceTicketPriority) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state TicketPriority
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -305,29 +304,29 @@ func (r resourceTicketPriority) Delete(ctx context.Context, req tfsdk.DeleteReso
 		return
 	}
 
-	tpID, err := strconv.Atoi(state.ID.Value)
+	tpID, err := strconv.Atoi(state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading ID",
-			"Could convert id "+state.ID.Value+": "+err.Error(),
+			"Could convert id "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 
-	err = r.p.client.DeleteTicketPriority(&client.TicketPriority{ID: tpID})
+	err = r.client.DeleteTicketPriority(&client.TicketPriority{ID: tpID})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting ticket_priority",
-			"Could not delete ticket_priority "+state.ID.Value+": "+err.Error(),
+			"Could not delete ticket_priority "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
 	}
 }
 
 // Import resource
-func (r resourceTicketPriority) ImportState(ctx context.Context, req tfsdk.ImportResourceStateRequest, resp *tfsdk.ImportResourceStateResponse) {
+func (r resourceTicketPriority) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Save the import identifier in the id attribute
-	tfsdk.ResourceImportStatePassthroughID(ctx, tftypes.NewAttributePath().WithAttributeName("id"), req, resp)
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
 type defaultTrue struct{}
@@ -352,5 +351,5 @@ func (m defaultTrue) Modify(ctx context.Context, req tfsdk.ModifyAttributePlanRe
 		return
 	}
 
-	resp.AttributePlan = types.Bool{Value: true}
+	resp.AttributePlan = types.BoolValue(true)
 }
