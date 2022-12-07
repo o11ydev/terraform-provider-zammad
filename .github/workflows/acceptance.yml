@@ -9,34 +9,24 @@
 # You will need to pass the `--batch` flag to `gpg` in your signing step
 # in `goreleaser` to indicate this is being used in a non-interactive mode.
 #
-name: Release
+name: Acceptance tests
 on:
   push:
     tags:
-      - "v*"
+      - v*
+    branches:
+      - master
+      - main
+  pull_request:
 jobs:
-  goreleaser:
+  testacc:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Unshallow
-        run: git fetch --prune --unshallow
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.19
-      - name: Import GPG key
-        id: import_gpg
-        uses: hashicorp/ghaction-import-gpg@v2.1.0
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          PASSPHRASE: ${{ secrets.PASSPHRASE }}
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --rm-dist
-        env:
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: launch zammad
+        run: cd docker_compose && docker-compose up -d && docker-compose exec zammad bash -e /up.sh
