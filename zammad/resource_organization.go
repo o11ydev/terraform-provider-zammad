@@ -23,74 +23,67 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/o11ydev/terraform-provider-zammad/internal/client"
 )
 
 // Order Resource schema
-func (r resourceOrganization) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
-	return tfsdk.Schema{
-		Attributes: map[string]tfsdk.Attribute{
-			"id": {
-				Type:          types.StringType,
+func (r resourceOrganization) GetSchema(_ context.Context) (schema.Schema, diag.Diagnostics) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:      true,
-				PlanModifiers: tfsdk.AttributePlanModifiers{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"name": {
-				Type:     types.StringType,
+			"name": schema.StringAttribute{
 				Required: true,
 			},
-			"shared": {
-				Type:          types.BoolType,
+			"shared": schema.BoolAttribute{
 				Optional:      true,
 				Computed:      true,
 				Description:   "Customers in the organization can see each other's items.",
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Bool{&defaultTrue{}, boolplanmodifier.UseStateForUnknown()},
 			},
-			"member_ids": {
-				Type:     types.ListType{ElemType: types.Int64Type},
+			"member_ids": schema.ListAttribute{
+				ElementType: types.Int64Type,
+				Computed:    true,
+				Optional:    true,
+			},
+			"domain": schema.StringAttribute{
 				Computed: true,
 				Optional: true,
 			},
-			"domain": {
-				Type:     types.StringType,
-				Computed: true,
-				Optional: true,
-			},
-			"domain_assignment": {
-				Type:        types.BoolType,
+			"domain_assignment": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Assign users based on user domain.",
 			},
-			"active": {
-				Type:          types.BoolType,
+			"active": schema.BoolAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Bool{&defaultTrue{}, boolplanmodifier.UseStateForUnknown()},
 			},
-			"note": {
-				Type:     types.StringType,
+			"note": schema.StringAttribute{
 				Optional: true,
 			},
-			"created_by_id": {
-				Type:          types.Int64Type,
+			"created_by_id": schema.Int64Attribute{
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
-			"updated_by_id": {
-				Type:     types.Int64Type,
+			"updated_by_id": schema.Int64Attribute{
 				Computed: true,
 			},
-			"created_at": {
-				Type:          types.StringType,
+			"created_at": schema.StringAttribute{
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"updated_at": {
-				Type:     types.StringType,
+			"updated_at": schema.StringAttribute{
 				Computed: true,
 			},
 		},
@@ -145,7 +138,7 @@ func (r resourceOrganization) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	members := make([]attr.Value, len(org.MemberIDs))
-	for i, _ := range org.MemberIDs {
+	for i := range org.MemberIDs {
 		members[i] = types.Int64Value(int64(org.MemberIDs[i]))
 	}
 

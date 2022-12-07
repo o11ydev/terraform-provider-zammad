@@ -22,7 +22,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	tfprovider "github.com/hashicorp/terraform-plugin-framework/provider"
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 
@@ -37,22 +37,17 @@ func New() tfprovider.Provider {
 	return &provider{}
 }
 
-type provider struct {
-}
+type provider struct{}
 
 // GetSchema
-func (p *provider) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
-	return tfsdk.Schema{
-		Attributes: map[string]tfsdk.Attribute{
-			"host": {
-				Type:     types.StringType,
-				Optional: true,
-				Computed: true,
+func (p *provider) GetSchema(_ context.Context) (schema.Schema, diag.Diagnostics) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"host": schema.StringAttribute{
+				Required: true,
 			},
-			"token": {
-				Type:      types.StringType,
+			"token": schema.StringAttribute{
 				Optional:  true,
-				Computed:  true,
 				Sensitive: true,
 			},
 		},
@@ -133,7 +128,7 @@ func (p *provider) Configure(ctx context.Context, req tfprovider.ConfigureReques
 	t := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 	}
-	transport := logging.NewTransport("Zammad", t)
+	transport := logging.NewSubsystemLoggingHTTPTransport("Zammad", t)
 
 	// Create a new Zammad client and set it to the provider client
 	c, err := client.New(host, token, transport)
@@ -156,6 +151,7 @@ func (p *provider) Resources(_ context.Context) []func() resource.Resource {
 		NewZammadOrganization,
 	}
 }
+
 func (p *provider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{}
 }

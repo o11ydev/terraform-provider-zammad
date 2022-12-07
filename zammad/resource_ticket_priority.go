@@ -22,6 +22,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -37,59 +42,50 @@ type resourceTicketPriority struct {
 }
 
 // Ticket Priority Resource schema
-func (r resourceTicketPriority) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnostics) {
-	return tfsdk.Schema{
-		Attributes: map[string]tfsdk.Attribute{
-			"id": {
-				Type:          types.StringType,
+func (r resourceTicketPriority) GetSchema(_ context.Context) (schema.Schema, diag.Diagnostics) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"name": {
-				Type:     types.StringType,
+			"name": schema.StringAttribute{
 				Required: true,
 			},
-			"note": {
-				Type:     types.StringType,
+			"note": schema.StringAttribute{
 				Optional: true,
 			},
-			"ui_icon": {
-				Type:     types.StringType,
+			"ui_icon": schema.StringAttribute{
 				Optional: true,
 			},
-			"ui_color": {
-				Type:     types.StringType,
+			"ui_color": schema.StringAttribute{
 				Optional: true,
 			},
-			"default_create": {
-				Type:          types.BoolType,
+			"default_create": schema.BoolAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
-			"active": {
-				Type:          types.BoolType,
+			"active": schema.BoolAttribute{
 				Optional:      true,
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{&defaultTrue{}, resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Bool{&defaultTrue{}, boolplanmodifier.UseStateForUnknown()},
 			},
-			"created_by_id": {
-				Type:          types.Int64Type,
+			"created_by_id": schema.Int64Attribute{
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
-			"updated_by_id": {
-				Type:     types.Int64Type,
-				Computed: true,
-			},
-			"created_at": {
-				Type:          types.StringType,
+			"updated_by_id": schema.Int64Attribute{
 				Computed:      true,
-				PlanModifiers: []tfsdk.AttributePlanModifier{resource.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
-			"updated_at": {
-				Type:     types.StringType,
-				Computed: true,
+			"created_at": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}, nil
@@ -339,9 +335,9 @@ func (m defaultTrue) MarkdownDescription(ctx context.Context) string {
 	return "If value is not configured, defaults to `true`"
 }
 
-func (m defaultTrue) Modify(ctx context.Context, req tfsdk.ModifyAttributePlanRequest, resp *tfsdk.ModifyAttributePlanResponse) {
+func (m defaultTrue) PlanModifyBool(ctx context.Context, req planmodifier.BoolRequest, resp *planmodifier.BoolResponse) {
 	var str types.Bool
-	diags := tfsdk.ValueAs(ctx, req.AttributePlan, &str)
+	diags := tfsdk.ValueAs(ctx, req.PlanValue, &str)
 	resp.Diagnostics.Append(diags...)
 	if diags.HasError() {
 		return
@@ -351,5 +347,5 @@ func (m defaultTrue) Modify(ctx context.Context, req tfsdk.ModifyAttributePlanRe
 		return
 	}
 
-	resp.AttributePlan = types.BoolValue(true)
+	resp.PlanValue = types.BoolValue(true)
 }
