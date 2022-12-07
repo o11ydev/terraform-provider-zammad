@@ -28,5 +28,11 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.19
-      - name: launch zammad
+      - name: Launch zammad
         run: cd docker_compose && docker-compose up -d && docker-compose exec -T zammad bash -e /up.sh
+      - name: Go tests
+        run: |
+          export ZAMMAD_HOST=http://127.0.0.1:8080
+          export ZAMMAD_TOKEN=b9rYaoj3s2Y5dijQ3ux4TiBlexpXgYPsgEn_BiA-EQkX0o2bm1C8mDFFMqqUT8Tr
+          make testacc
+
