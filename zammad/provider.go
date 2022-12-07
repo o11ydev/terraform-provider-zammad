@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	tfprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -39,19 +38,18 @@ func New() tfprovider.Provider {
 
 type provider struct{}
 
-// GetSchema
-func (p *provider) GetSchema(_ context.Context) (schema.Schema, diag.Diagnostics) {
-	return schema.Schema{
+func (p *provider) Schema(_ context.Context, req tfprovider.SchemaRequest, resp *tfprovider.SchemaResponse) {
+	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
-				Required: true,
+				Optional: true,
 			},
 			"token": schema.StringAttribute{
 				Optional:  true,
 				Sensitive: true,
 			},
 		},
-	}, nil
+	}
 }
 
 func (p *provider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {

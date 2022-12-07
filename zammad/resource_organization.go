@@ -20,7 +20,6 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,8 +33,8 @@ import (
 )
 
 // Order Resource schema
-func (r resourceOrganization) GetSchema(_ context.Context) (schema.Schema, diag.Diagnostics) {
-	return schema.Schema{
+func (r resourceOrganization) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -87,7 +86,7 @@ func (r resourceOrganization) GetSchema(_ context.Context) (schema.Schema, diag.
 				Computed: true,
 			},
 		},
-	}, nil
+	}
 }
 
 func NewZammadOrganization() resource.Resource {
@@ -241,6 +240,9 @@ func (r resourceOrganization) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	members := make([]int, 0)
+	plan.MemberIDs.ElementsAs(ctx, &members, true)
+
 	updatedOrg := &client.Organization{
 		ID:               orgID,
 		Name:             plan.Name.ValueString(),
@@ -249,6 +251,7 @@ func (r resourceOrganization) Update(ctx context.Context, req resource.UpdateReq
 		DomainAssignment: plan.DomainAssignment.ValueBool(),
 		Active:           plan.Active.ValueBool(),
 		Shared:           plan.Shared.ValueBool(),
+		MemberIDs:        members,
 	}
 
 	org, err := r.client.UpdateOrganization(updatedOrg)
@@ -260,6 +263,10 @@ func (r resourceOrganization) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	tfmembers := make([]attr.Value, len(org.MemberIDs))
+	for i := range org.MemberIDs {
+		tfmembers[i] = types.Int64Value(int64(org.MemberIDs[i]))
+	}
 	result := Organization{
 		ID:               types.StringValue(strconv.Itoa(org.ID)),
 		Name:             types.StringValue(org.Name),
@@ -272,6 +279,7 @@ func (r resourceOrganization) Update(ctx context.Context, req resource.UpdateReq
 		UpdatedByID:      types.Int64Value(int64(org.UpdatedByID)),
 		CreatedAt:        types.StringValue(org.CreatedAt),
 		UpdatedAt:        types.StringValue(org.UpdatedAt),
+		MemberIDs:        types.ListValueMust(types.Int64Type, tfmembers),
 	}
 	if plan.Note.IsNull() && org.Note == "" {
 		result.Note = types.StringNull()

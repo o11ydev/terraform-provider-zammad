@@ -19,8 +19,11 @@ import (
 	"fmt"
 	"testing"
 
+	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
+
+var _ tfresource.ResourceWithSchema = &resourceOrganization{}
 
 func TestAccBasicOrganizationResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
